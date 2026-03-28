@@ -146,6 +146,7 @@ Toggle with `WATI_MODE=mock` or `WATI_MODE=real`:
 - Set `AGENT_LOCALE=pt` to force Portuguese, or leave empty for auto-detection
 - The LLM detects the user's language and calls the internal `set_language` tool
 - Add a new locale: create `src/i18n/xx.json` and register it in `src/i18n/index.ts`
+- In the web UI, select the language via the `lang` query parameter (e.g. `/?lang=pt`)
 
 ## Demo Scenario: New Client Onboarding
 
