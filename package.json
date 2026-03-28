@@ -1,0 +1,27 @@
+{
+  "name": "whatsapp-config-agent-nlp",
+  "version": "1.0.0",
+  "description": "AI Agent that translates natural language into WhatsApp Business (WATI) API workflows",
+  "type": "module",
+  "scripts": {
+    "start": "tsx src/index.ts",
+    "web": "tsx src/index.ts --web",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@anthropic-ai/sdk": "^0.52.0",
+    "@google/generative-ai": "^0.24.1",
+    "axios": "^1.7.0",
+    "dotenv": "^16.4.0",
+    "express": "^4.21.0"
+  },
+  "devDependencies": {
+    "@types/express": "^4.17.21",
+    "@types/node": "^22.0.0",
+    "tsx": "^4.19.0",
+    "typescript": "^5.6.0",
+    "vitest": "^2.1.0"
+  }
+}

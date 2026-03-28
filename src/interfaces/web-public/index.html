@@ -1,0 +1,257 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>WhatsApp Config Agent</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <div class="app">
+    <header>
+      <div class="header-row">
+        <h1>💬 WhatsApp Config Agent</h1>
+        <select id="lang-select" class="lang-select" title="Language">
+          <option value="en">EN</option>
+          <option value="pt">PT</option>
+        </select>
+      </div>
+      <p id="subtitle" class="subtitle"></p>
+    </header>
+
+    <div id="messages" class="messages"></div>
+
+    <div id="confirm-bar" class="confirm-bar hidden">
+      <span id="confirm-prompt"></span>
+      <button id="btn-confirm" class="btn btn-confirm"></button>
+      <button id="btn-reject" class="btn btn-reject"></button>
+    </div>
+
+    <form id="input-form" class="input-area">
+      <input
+        type="text"
+        id="user-input"
+        autocomplete="off"
+        autofocus
+      />
+      <button type="submit" id="btn-send" class="btn btn-send"></button>
+    </form>
+  </div>
+
+  <script>
+    const messagesEl = document.getElementById('messages');
+    const inputForm = document.getElementById('input-form');
+    const userInput = document.getElementById('user-input');
+    const confirmBar = document.getElementById('confirm-bar');
+    const btnConfirm = document.getElementById('btn-confirm');
+    const btnReject = document.getElementById('btn-reject');
+    const btnSend = document.getElementById('btn-send');
+    const langSelect = document.getElementById('lang-select');
+
+    let pendingPlan = null;
+    let i18n = {};
+
+    async function fetchTranslations() {
+      const res = await fetch('/api/translations');
+      i18n = await res.json();
+    }
+
+    function applyTranslations() {
+      document.getElementById('subtitle').textContent = i18n['web.subtitle'] || '';
+      userInput.placeholder = i18n['web.placeholder'] || '';
+      btnSend.textContent = i18n['web.send'] || '';
+      document.getElementById('confirm-prompt').textContent = i18n['web.confirm_prompt'] || '';
+      btnConfirm.textContent = i18n['web.confirm_yes'] || '';
+      btnReject.textContent = i18n['web.confirm_no'] || '';
+    }
+
+    function renderWelcomeMessage() {
+      messagesEl.innerHTML = '';
+      const welcome = i18n['web.welcome'] || '';
+      const exTitle = i18n['web.examples_title'] || '';
+      const ex1 = i18n['web.example1'] || '';
+      const ex2 = i18n['web.example2'] || '';
+      const ex3 = i18n['web.example3'] || '';
+      const html = `${escapeHtml(welcome)}<br><br>` +
+        `<strong>${escapeHtml(exTitle)}</strong>` +
+        `<ul><li>"${escapeHtml(ex1)}"</li>` +
+        `<li>"${escapeHtml(ex2)}"</li>` +
+        `<li>"${escapeHtml(ex3)}"</li></ul>`;
+      addMessage('assistant', html);
+    }
+
+    async function setServerLocale(locale) {
+      await fetch('/api/locale', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ locale }),
+      });
+    }
+
+    // Init: read ?lang= query param, sync with server, fetch translations
+    (async function init() {
+      const params = new URLSearchParams(window.location.search);
+      const langParam = params.get('lang');
+
+      if (langParam) {
+        await setServerLocale(langParam);
+        langSelect.value = langParam;
+      } else {
+        const res = await fetch('/api/locale');
+        const data = await res.json();
+        langSelect.value = data.locale;
+      }
+
+      await fetchTranslations();
+      applyTranslations();
+      renderWelcomeMessage();
+    })();
+
+    langSelect.addEventListener('change', async () => {
+      const locale = langSelect.value;
+      await setServerLocale(locale);
+      await fetchTranslations();
+      applyTranslations();
+      renderWelcomeMessage();
+
+      const url = new URL(window.location);
+      url.searchParams.set('lang', locale);
+      window.history.replaceState({}, '', url);
+    });
+
+    function addMessage(role, html) {
+      const div = document.createElement('div');
+      div.className = `message ${role}`;
+      div.innerHTML = `<div class="message-content">${html}</div>`;
+      messagesEl.appendChild(div);
+      messagesEl.scrollTop = messagesEl.scrollHeight;
+    }
+
+    function formatPlan(plan) {
+      let html = '<div class="plan">';
+      html += '<strong>📋 Plan:</strong><ol>';
+      for (const step of plan.steps) {
+        const icon = step.destructive ? '⚠️ ' : '';
+        html += `<li class="${step.destructive ? 'destructive' : ''}">${icon}${escapeHtml(step.description)}</li>`;
+      }
+      html += '</ol></div>';
+      return html;
+    }
+
+    function escapeHtml(str) {
+      const div = document.createElement('div');
+      div.textContent = str;
+      return div.innerHTML;
+    }
+
+    function setLoading(loading) {
+      btnSend.disabled = loading;
+      userInput.disabled = loading;
+      if (loading) {
+        addMessage('assistant', `<em>${escapeHtml(i18n['thinking'] || 'Thinking...')}</em>`);
+      }
+    }
+
+    function removeThinking() {
+      const msgs = messagesEl.querySelectorAll('.message.assistant');
+      const last = msgs[msgs.length - 1];
+      if (last && last.querySelector('em')) {
+        last.remove();
+      }
+    }
+
+    inputForm.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const text = userInput.value.trim();
+      if (!text) return;
+
+      addMessage('user', escapeHtml(text));
+      userInput.value = '';
+      setLoading(true);
+
+      try {
+        const res = await fetch('/api/chat', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ message: text }),
+        });
+        const data = await res.json();
+        removeThinking();
+
+        if (data.error) {
+          addMessage('assistant', `❌ ${escapeHtml(data.error)}`);
+        } else if (data.plan && data.plan.steps.length > 0) {
+          pendingPlan = data.plan;
+          let html = '';
+          if (data.text) html += `<p>${escapeHtml(data.text)}</p>`;
+          html += formatPlan(data.plan);
+          addMessage('assistant', html);
+
+          if (data.plan.requiresConfirmation) {
+            confirmBar.classList.remove('hidden');
+            userInput.disabled = true;
+            btnSend.disabled = true;
+          }
+        } else if (data.text) {
+          addMessage('assistant', data.text.replace(/\n/g, '<br>'));
+        }
+      } catch (err) {
+        removeThinking();
+        addMessage('assistant', `❌ Error: ${escapeHtml(err.message)}`);
+      }
+
+      setLoading(false);
+    });
+
+    btnConfirm.addEventListener('click', async () => {
+      confirmBar.classList.add('hidden');
+      addMessage('user', escapeHtml(i18n['web.confirmed'] || 'Confirmed'));
+      setLoading(true);
+
+      try {
+        const res = await fetch('/api/confirm', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ confirmed: true }),
+        });
+        const data = await res.json();
+        removeThinking();
+
+        if (data.text) {
+          addMessage('assistant', data.text.replace(/\n/g, '<br>'));
+        }
+      } catch (err) {
+        removeThinking();
+        addMessage('assistant', `❌ Error: ${escapeHtml(err.message)}`);
+      }
+
+      pendingPlan = null;
+      setLoading(false);
+      userInput.disabled = false;
+      btnSend.disabled = false;
+      userInput.focus();
+    });
+
+    btnReject.addEventListener('click', async () => {
+      confirmBar.classList.add('hidden');
+      addMessage('user', escapeHtml(i18n['web.cancelled'] || 'Cancelled'));
+
+      try {
+        await fetch('/api/confirm', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ confirmed: false }),
+        });
+        addMessage('assistant', escapeHtml(i18n['plan.cancelled'] || 'Plan cancelled.'));
+      } catch (err) {
+        addMessage('assistant', `❌ Error: ${escapeHtml(err.message)}`);
+      }
+
+      pendingPlan = null;
+      userInput.disabled = false;
+      btnSend.disabled = false;
+      userInput.focus();
+    });
+  </script>
+</body>
+</html>
