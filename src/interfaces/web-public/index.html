@@ -11,15 +11,23 @@
     <header>
       <div class="header-row">
         <h1>💬 WhatsApp Config Agent</h1>
-        <select id="lang-select" class="lang-select" title="Language">
-          <option value="en">EN</option>
-          <option value="pt">PT</option>
-        </select>
+        <div class="header-controls">
+          <button id="btn-tts" class="btn-icon" title="Read responses aloud" style="display:none;">🔇</button>
+          <select id="lang-select" class="lang-select" title="Language">
+            <option value="en">EN</option>
+            <option value="pt">PT</option>
+          </select>
+        </div>
       </div>
       <p id="subtitle" class="subtitle"></p>
     </header>
 
     <div id="messages" class="messages"></div>
+
+    <div id="recording-indicator" class="recording-indicator hidden">
+      <div class="recording-dot"></div>
+      <span id="recording-text"></span>
+    </div>
 
     <div id="confirm-bar" class="confirm-bar hidden">
       <span id="confirm-prompt"></span>
@@ -34,6 +42,7 @@
         autocomplete="off"
         autofocus
       />
+      <button type="button" id="btn-mic" class="btn btn-mic" title="Voice input" style="display:none;">🎤</button>
       <button type="submit" id="btn-send" class="btn btn-send"></button>
     </form>
   </div>
@@ -47,9 +56,125 @@
     const btnReject = document.getElementById('btn-reject');
     const btnSend = document.getElementById('btn-send');
     const langSelect = document.getElementById('lang-select');
+    const btnMic = document.getElementById('btn-mic');
+    const btnTts = document.getElementById('btn-tts');
+    const recordingIndicator = document.getElementById('recording-indicator');
+    const recordingText = document.getElementById('recording-text');
 
     let pendingPlan = null;
     let i18n = {};
+
+    // --- Text-to-Speech ---
+    let ttsEnabled = false;
+
+    if ('speechSynthesis' in window) {
+      btnTts.style.display = '';
+    }
+
+    btnTts.addEventListener('click', () => {
+      ttsEnabled = !ttsEnabled;
+      btnTts.textContent = ttsEnabled ? '🔊' : '🔇';
+      btnTts.classList.toggle('active', ttsEnabled);
+      btnTts.title = ttsEnabled
+        ? (i18n['web.tts_on'] || 'Voice responses on')
+        : (i18n['web.tts_off'] || 'Voice responses off');
+      if (!ttsEnabled) speechSynthesis.cancel();
+    });
+
+    function speakText(text) {
+      if (!ttsEnabled || !('speechSynthesis' in window)) return;
+      speechSynthesis.cancel();
+      const cleanText = text
+        .replace(/<[^>]*>/g, ' ')
+        .replace(/[\u{1F000}-\u{1FFFF}]/gu, '')
+        .replace(/\s+/g, ' ')
+        .trim();
+      if (!cleanText) return;
+      const utterance = new SpeechSynthesisUtterance(cleanText);
+      utterance.lang = langSelect.value === 'pt' ? 'pt-BR' : 'en-US';
+      speechSynthesis.speak(utterance);
+    }
+
+    // --- Speech-to-Text ---
+    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+    let recognition = null;
+    let isRecording = false;
+
+    if (SpeechRecognition) {
+      btnMic.style.display = '';
+      recognition = new SpeechRecognition();
+      recognition.continuous = false;
+      recognition.interimResults = true;
+      recognition.maxAlternatives = 1;
+
+      recognition.onstart = () => {
+        isRecording = true;
+        btnMic.classList.add('recording');
+        btnMic.textContent = '⏹';
+        recordingIndicator.classList.remove('hidden');
+        recordingText.textContent = i18n['web.listening'] || 'Listening...';
+      };
+
+      recognition.onresult = (event) => {
+        let interimTranscript = '';
+        let finalTranscript = '';
+        for (let i = event.resultIndex; i < event.results.length; i++) {
+          const transcript = event.results[i][0].transcript;
+          if (event.results[i].isFinal) {
+            finalTranscript += transcript;
+          } else {
+            interimTranscript += transcript;
+          }
+        }
+        if (interimTranscript) {
+          recordingText.textContent = interimTranscript;
+        }
+        if (finalTranscript.trim()) {
+          sendMessage(finalTranscript.trim());
+        }
+      };
+
+      recognition.onend = () => {
+        isRecording = false;
+        btnMic.classList.remove('recording');
+        btnMic.textContent = '🎤';
+        recordingIndicator.classList.add('hidden');
+      };
+
+      recognition.onerror = (event) => {
+        isRecording = false;
+        btnMic.classList.remove('recording');
+        btnMic.textContent = '🎤';
+        recordingIndicator.classList.add('hidden');
+        if (event.error === 'not-allowed') {
+          addMessage('assistant', escapeHtml(i18n['web.mic_denied'] || 'Microphone access was denied. Please allow microphone access in your browser settings.'));
+        } else if (event.error === 'network') {
+          addMessage('assistant', escapeHtml(i18n['web.mic_network_error'] || 'Speech recognition requires an internet connection.'));
+        }
+      };
+    }
+
+    function getSpeechLang() {
+      const langMap = { en: 'en-US', pt: 'pt-BR' };
+      return langMap[langSelect.value] || 'en-US';
+    }
+
+    function startRecording() {
+      if (!recognition || isRecording) return;
+      recognition.lang = getSpeechLang();
+      try { recognition.start(); } catch (e) { /* already started */ }
+    }
+
+    function stopRecording() {
+      if (!recognition || !isRecording) return;
+      recognition.stop();
+    }
+
+    btnMic.addEventListener('click', () => {
+      if (isRecording) { stopRecording(); } else { startRecording(); }
+    });
+
+    // --- Core UI ---
 
     async function fetchTranslations() {
       const res = await fetch('/api/translations');
@@ -63,6 +188,7 @@
       document.getElementById('confirm-prompt').textContent = i18n['web.confirm_prompt'] || '';
       btnConfirm.textContent = i18n['web.confirm_yes'] || '';
       btnReject.textContent = i18n['web.confirm_no'] || '';
+      btnMic.title = i18n['web.mic_title'] || 'Voice input';
     }
 
     function renderWelcomeMessage() {
@@ -108,6 +234,9 @@
     })();
 
     langSelect.addEventListener('change', async () => {
+      if (isRecording) stopRecording();
+      if ('speechSynthesis' in window) speechSynthesis.cancel();
+
       const locale = langSelect.value;
       await setServerLocale(locale);
       await fetchTranslations();
@@ -147,6 +276,7 @@
     function setLoading(loading) {
       btnSend.disabled = loading;
       userInput.disabled = loading;
+      btnMic.disabled = loading;
       if (loading) {
         addMessage('assistant', `<em>${escapeHtml(i18n['thinking'] || 'Thinking...')}</em>`);
       }
@@ -160,13 +290,10 @@
       }
     }
 
-    inputForm.addEventListener('submit', async (e) => {
-      e.preventDefault();
-      const text = userInput.value.trim();
-      if (!text) return;
+    // --- Send message (used by both text input and voice) ---
 
+    async function sendMessage(text) {
       addMessage('user', escapeHtml(text));
-      userInput.value = '';
       setLoading(true);
 
       try {
@@ -186,14 +313,17 @@
           if (data.text) html += `<p>${escapeHtml(data.text)}</p>`;
           html += formatPlan(data.plan);
           addMessage('assistant', html);
+          if (data.text) speakText(data.text);
 
           if (data.plan.requiresConfirmation) {
             confirmBar.classList.remove('hidden');
             userInput.disabled = true;
             btnSend.disabled = true;
+            btnMic.disabled = true;
           }
         } else if (data.text) {
           addMessage('assistant', data.text.replace(/\n/g, '<br>'));
+          speakText(data.text);
         }
       } catch (err) {
         removeThinking();
@@ -201,6 +331,14 @@
       }
 
       setLoading(false);
+    }
+
+    inputForm.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const text = userInput.value.trim();
+      if (!text) return;
+      userInput.value = '';
+      sendMessage(text);
     });
 
     btnConfirm.addEventListener('click', async () => {
@@ -219,6 +357,7 @@
 
         if (data.text) {
           addMessage('assistant', data.text.replace(/\n/g, '<br>'));
+          speakText(data.text);
         }
       } catch (err) {
         removeThinking();
@@ -229,6 +368,7 @@
       setLoading(false);
       userInput.disabled = false;
       btnSend.disabled = false;
+      btnMic.disabled = false;
       userInput.focus();
     });
 
@@ -242,7 +382,9 @@
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ confirmed: false }),
         });
-        addMessage('assistant', escapeHtml(i18n['plan.cancelled'] || 'Plan cancelled.'));
+        const cancelMsg = i18n['plan.cancelled'] || 'Plan cancelled.';
+        addMessage('assistant', escapeHtml(cancelMsg));
+        speakText(cancelMsg);
       } catch (err) {
         addMessage('assistant', `❌ Error: ${escapeHtml(err.message)}`);
       }
@@ -250,6 +392,7 @@
       pendingPlan = null;
       userInput.disabled = false;
       btnSend.disabled = false;
+      btnMic.disabled = false;
       userInput.focus();
     });
   </script>

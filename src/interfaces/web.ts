@@ -76,6 +76,9 @@ export function startWeb(agent: Agent, port: number = 3000): void {
     "web.confirm_prompt", "web.confirm_yes", "web.confirm_no",
     "web.confirmed", "web.cancelled",
     "thinking", "plan.cancelled",
+    "web.mic_title", "web.listening", "web.mic_denied",
+    "web.mic_network_error", "web.mic_unsupported",
+    "web.tts_on", "web.tts_off", "web.voice_input",
   ];
 
   app.get("/api/translations", (_req, res) => {

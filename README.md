@@ -148,6 +148,39 @@ Toggle with `WATI_MODE=mock` or `WATI_MODE=real`:
 - Add a new locale: create `src/i18n/xx.json` and register it in `src/i18n/index.ts`
 - In the web UI, select the language via the `lang` query parameter (e.g. `/?lang=pt`)
 
+## Voice Input & Output
+
+The Web UI supports voice interaction via the browser-native Web Speech API — no extra dependencies or API keys needed.
+
+### Speech-to-Text (Voice Input)
+
+Click the **🎤 microphone button** (next to Send) to speak a command. Your speech is transcribed in real-time and sent through the same pipeline as typed text.
+
+- Uses `SpeechRecognition` / `webkitSpeechRecognition`
+- Shows a live transcript and pulsing red indicator while recording
+- Automatically stops after one utterance
+- Language follows the UI locale (`en-US` / `pt-BR`)
+
+### Text-to-Speech (Voice Output)
+
+Click the **🔇 speaker toggle** (in the header) to enable reading agent responses aloud.
+
+- Uses `SpeechSynthesis` (browser-native)
+- Speaks text responses and plan confirmations
+- Strips HTML tags and emojis for clean audio
+- Toggle off at any time to stop and disable
+
+### Browser Support
+
+Both features use the Web Speech API, which is best supported in Chrome and Edge. On unsupported browsers, the mic and speaker buttons are automatically hidden — the text-based UI remains fully functional.
+
+### Edge Cases Handled
+
+- Microphone permission denied → friendly error message in chat
+- Network unavailable (Chrome sends audio to Google servers) → error message
+- Language change while recording → recording stops cleanly, speech cancelled
+- Mic disabled during loading state and plan confirmation
+
 ## Demo Scenario: New Client Onboarding
 
 Try this in the CLI or Web UI:
@@ -207,7 +240,7 @@ npm run test:watch
 npm run typecheck
 ```
 
-**34 tests** covering:
+**41 tests** covering:
 - Mock WATI client (contact CRUD, tags, templates, operators)
 - Planner (plan building, destructive detection, step descriptions)
 - Executor (step execution, plan orchestration, error handling)

@@ -19,6 +19,6 @@ export const config = {
     locale: process.env.AGENT_LOCALE || "",
   },
   web: {
-    port: parseInt(process.env.WEB_PORT || "3000", 10),
+    port: parseInt(process.env.PORT || process.env.WEB_PORT || "3000", 10),
   },
 };

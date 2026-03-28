@@ -52,5 +52,13 @@
   "web.confirm_yes": "✅ Yes, execute",
   "web.confirm_no": "❌ Cancel",
   "web.confirmed": "✅ Confirmed — executing plan",
-  "web.cancelled": "❌ Cancelled"
+  "web.cancelled": "❌ Cancelled",
+  "web.mic_title": "Voice input",
+  "web.listening": "Listening...",
+  "web.mic_denied": "Microphone access was denied. Please allow microphone access in your browser settings.",
+  "web.mic_network_error": "Speech recognition requires an internet connection.",
+  "web.mic_unsupported": "Voice input is not supported in this browser.",
+  "web.tts_on": "Voice responses on",
+  "web.tts_off": "Voice responses off",
+  "web.voice_input": "Voice"
 }

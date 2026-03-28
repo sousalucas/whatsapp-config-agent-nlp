@@ -52,5 +52,13 @@
   "web.confirm_yes": "✅ Sim, executar",
   "web.confirm_no": "❌ Cancelar",
   "web.confirmed": "✅ Confirmado — executando plano",
-  "web.cancelled": "❌ Cancelado"
+  "web.cancelled": "❌ Cancelado",
+  "web.mic_title": "Entrada de voz",
+  "web.listening": "Ouvindo...",
+  "web.mic_denied": "O acesso ao microfone foi negado. Permita o acesso ao microfone nas configurações do seu navegador.",
+  "web.mic_network_error": "O reconhecimento de voz requer conexão com a internet.",
+  "web.mic_unsupported": "Entrada de voz não é suportada neste navegador.",
+  "web.tts_on": "Respostas por voz ativadas",
+  "web.tts_off": "Respostas por voz desativadas",
+  "web.voice_input": "Voz"
 }
