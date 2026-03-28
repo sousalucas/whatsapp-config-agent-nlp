@@ -31,16 +31,17 @@ User Input (natural language)
        │
        ▼
 ┌─────────────┐
-│    Agent     │ ← Core orchestrator
+│    Agent    │ ← Core orchestrator
 │  agent.ts   │
 └──────┬──────┘
        │
        ▼
-┌─────────────┐     ┌──────────────┐
-│  LLM        │────▶│   Planner    │
-│  Adapter    │     │  planner.ts  │
-│ (Anthropic) │     └──────┬───────┘
-└─────────────┘            │
+┌──────────────┐     ┌──────────────┐
+│  LLM         │────▶│   Planner    │
+│  Adapter     │     │  planner.ts  │
+│ (Anthropic/  │     └─────┬────────┘
+|   Gemini...) │           |
+└──────────────┘           │
                            ▼
                    ┌──────────────┐     ┌──────────────┐
                    │   Executor   │────▶│ WATI Client  │
