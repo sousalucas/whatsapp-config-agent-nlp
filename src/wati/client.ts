@@ -11,6 +11,7 @@ import { WatiApiError } from "../utils/errors.js";
 import { logger } from "../utils/logger.js";
 
 function classifyAxiosError(err: unknown, operation: string): WatiApiError {
+  if (err instanceof WatiApiError) return err;
   if (axios.isAxiosError(err)) {
     const axErr = err as AxiosError;
     const status = axErr.response?.status;
@@ -62,12 +63,23 @@ export class RealWatiClient implements WatiClient {
 
       const res = await this.http.get("/api/v1/getContacts", { params: queryParams });
       const data = res.data;
-      const contacts: Contact[] = (data.contact_list || data.contacts || []).map(
-        (c: Record<string, unknown>) => this.normalizeContact(c)
+      // WATI returns contact_list as an object { items, count, pageSize, pageNumber }
+      // Fall back to direct array in case of API version differences
+      const contactList = data.contact_list;
+      const rawContacts: unknown[] = Array.isArray(contactList)
+        ? contactList
+        : Array.isArray(contactList?.items)
+          ? contactList.items
+          : Array.isArray(data.contacts)
+            ? data.contacts
+            : [];
+      const contacts: Contact[] = rawContacts.map(
+        (c) => this.normalizeContact(c as Record<string, unknown>)
       );
+      const total = contactList?.count ?? contactList?.total ?? contacts.length;
       return {
         items: contacts,
-        total: contacts.length,
+        total,
         pageNumber: queryParams.pageNumber as number,
         pageSize: queryParams.pageSize as number,
       };
@@ -103,7 +115,20 @@ export class RealWatiClient implements WatiClient {
         name,
         customParams: customParams || [],
       });
-      return this.normalizeContact(res.data);
+      // WATI signals failure with HTTP 200 + result:false — surface the real reason
+      if (res.data.result === false) {
+        const reason = res.data.info || "addContact failed";
+        throw new WatiApiError(reason, "error.wati", {}, undefined);
+      }
+      // WATI may return just {result: true} without full contact data; fall back to a minimal contact
+      const raw = res.data || {};
+      const contact = raw.contact || raw;
+      return this.normalizeContact({
+        wAid: whatsappNumber,
+        phone: whatsappNumber,
+        name,
+        ...contact,
+      });
     } catch (err) {
       const watiErr = classifyAxiosError(err, "addContact");
       logger.error("WatiClient", watiErr.message, { error: err, whatsappNumber, name });
