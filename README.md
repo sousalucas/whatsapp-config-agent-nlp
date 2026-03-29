@@ -322,3 +322,7 @@ npm run test:e2e:cli      # 6 CLI interaction tests (Vitest + execa)
 | Dev runner | tsx | Direct TS execution, no build |
 
 **4 runtime dependencies. No framework overhead.**
+
+## FAQ
+
+See [FAQ.md](FAQ.md) for common questions and troubleshooting.
