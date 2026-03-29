@@ -85,8 +85,10 @@ src/
 │   └── tools.ts                # 14 tool definitions (JSON schemas for LLM)
 ├── llm/
 │   ├── types.ts                # LLMProvider interface
-│   ├── factory.ts              # ENV-based provider selection
-│   └── anthropic.ts            # Anthropic tool-use adapter
+│   ├── factory.ts              # ENV-based provider selection (anthropic | gemini | mock)
+│   ├── anthropic.ts            # Anthropic tool-use adapter
+│   ├── gemini.ts               # Google Gemini adapter
+│   └── mock.ts                 # Pattern-matched mock LLM (for CLI e2e tests)
 ├── wati/
 │   ├── types.ts                # WatiClient interface + domain types
 │   ├── factory.ts              # ENV-based mock/real selection
@@ -98,10 +100,37 @@ src/
 │   └── pt.json                 # Portuguese strings
 ├── interfaces/
 │   ├── cli.ts                  # Readline REPL
-│   ├── web.ts                  # Express REST API
+│   ├── web.ts                  # Express REST API (createWebApp + startWeb)
 │   └── web-public/             # Static chat UI (HTML/CSS/JS)
 └── utils/
     └── config.ts               # ENV loading
+
+tests/                          # Unit tests (Vitest)
+├── mock-wati.test.ts
+├── planner.test.ts
+├── executor.test.ts
+├── i18n.test.ts
+└── errors.test.ts
+
+e2e/                            # E2E tests
+├── playwright.config.ts        # Playwright config (Chromium, API + Web UI)
+├── fixtures/
+│   ├── mock-llm.ts             # Queue-based MockLLMProvider
+│   ├── test-server.ts          # Starts Express on random port per test
+│   ├── llm-scenarios.ts        # Pre-built LLM response sequences
+│   └── playwright-fixtures.ts  # Custom Playwright fixtures
+├── api/                        # API e2e tests (no browser)
+│   ├── health.spec.ts
+│   ├── chat.spec.ts
+│   ├── confirm.spec.ts
+│   └── locale.spec.ts
+├── web-ui/                     # Browser e2e tests (Chromium)
+│   ├── elements.spec.ts
+│   ├── chat.spec.ts
+│   ├── language.spec.ts
+│   └── confirmation.spec.ts
+└── cli/                        # CLI e2e tests (Vitest + execa)
+    └── cli.spec.ts
 ```
 
 ## Configuration
@@ -110,7 +139,7 @@ All configuration via environment variables (`.env` file):
 
 ```env
 # LLM Provider
-LLM_PROVIDER=anthropic            # anthropic (more providers planned)
+LLM_PROVIDER=anthropic            # anthropic | gemini | mock (mock = no API key, for e2e tests)
 ANTHROPIC_API_KEY=sk-ant-...      # Required
 ANTHROPIC_MODEL=claude-sonnet-4-20250514  # Default model
 
@@ -229,15 +258,16 @@ Read-only tools execute automatically. Destructive tools require user confirmati
 
 ## Testing
 
+The project has two layers of tests: unit tests (Vitest) and end-to-end tests (Playwright + Vitest).
+
+### Unit Tests
+
 ```bash
-# Run all tests
+# Run all unit tests
 npm test
 
 # Watch mode
 npm run test:watch
-
-# Type checking
-npm run typecheck
 ```
 
 **41 tests** covering:
@@ -245,6 +275,36 @@ npm run typecheck
 - Planner (plan building, destructive detection, step descriptions)
 - Executor (step execution, plan orchestration, error handling)
 - i18n (locale switching, variable replacement, fallbacks)
+
+### E2E Tests
+
+E2E tests use **Playwright** for the Web UI and API, and **Vitest + execa** for the CLI. All tests run against a mock LLM and mock WATI client — no API keys needed.
+
+```bash
+# Run all e2e tests (API + Web UI + CLI)
+npm run test:e2e
+
+# Run individual suites
+npm run test:e2e:api      # 12 API endpoint tests (Playwright)
+npm run test:e2e:web      # 17 Web UI browser tests (Playwright/Chromium)
+npm run test:e2e:cli      # 6 CLI interaction tests (Vitest + execa)
+```
+
+**35 e2e tests** covering:
+
+| Suite | Tool | Tests |
+|-------|------|------:|
+| API: `/api/chat`, `/api/confirm`, `/api/locale`, `/api/health` | Playwright | 12 |
+| Web UI: elements, chat, language switching, plan confirm/reject | Playwright (Chromium) | 17 |
+| CLI: exit, greeting, read-only queries, confirm/reject flow | Vitest + execa | 6 |
+
+#### E2E Architecture
+
+- **`e2e/fixtures/mock-llm.ts`** — queue-based `MockLLMProvider` (enqueue scripted responses per test)
+- **`e2e/fixtures/test-server.ts`** — starts Express on a random port; each test gets an isolated server
+- **`e2e/fixtures/llm-scenarios.ts`** — pre-built response sequences (greeting, list contacts, send template)
+- **`e2e/fixtures/playwright-fixtures.ts`** — Playwright custom fixture wiring server + mock LLM per test
+- **`LLM_PROVIDER=mock`** — pattern-matched mock LLM for CLI subprocess tests (no API key needed)
 
 ## Tech Stack
 
@@ -254,7 +314,7 @@ npm run typecheck
 | LLM | Anthropic Claude (tool use) | Best-in-class tool calling |
 | HTTP | Axios | Reliable for API integration |
 | Web | Express | Minimal, no build step needed |
-| Tests | Vitest | Fast, TypeScript-native |
+| Tests | Vitest + Playwright | Unit tests + full e2e coverage |
 | Dev runner | tsx | Direct TS execution, no build |
 
 **4 runtime dependencies. No framework overhead.**

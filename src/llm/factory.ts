@@ -2,6 +2,7 @@ import { config } from "../utils/config.js";
 import type { LLMProvider } from "./types.js";
 import { AnthropicProvider } from "./anthropic.js";
 import { GeminiProvider } from "./gemini.js";
+import { MockLLMProvider } from "./mock.js";
 
 export function createLLMProvider(): LLMProvider {
   const provider = config.llm.provider;
@@ -23,9 +24,11 @@ export function createLLMProvider(): LLMProvider {
         apiKey: config.llm.googleApiKey,
         model: config.llm.googleModel,
       });
+    case "mock":
+      return new MockLLMProvider();
     default:
       throw new Error(
-        `Unknown LLM_PROVIDER: "${provider}". Supported: anthropic, gemini`
+        `Unknown LLM_PROVIDER: "${provider}". Supported: anthropic, gemini, mock`
       );
   }
 }

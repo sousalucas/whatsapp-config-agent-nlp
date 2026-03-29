@@ -21,7 +21,7 @@ function handleApiError(err: unknown, res: express.Response): void {
   }
 }
 
-export function startWeb(agent: Agent, port: number = 3000): void {
+export function createWebApp(agent: Agent): express.Express {
   const app = express();
   app.use(express.json());
   app.use(express.static(path.join(__dirname, "web-public")));
@@ -93,6 +93,11 @@ export function startWeb(agent: Agent, port: number = 3000): void {
     res.json({ status: "ok" });
   });
 
+  return app;
+}
+
+export function startWeb(agent: Agent, port: number = 3000): void {
+  const app = createWebApp(agent);
   app.listen(port, () => {
     console.log(`\n🌐 Web UI running at http://localhost:${port}\n`);
   });
