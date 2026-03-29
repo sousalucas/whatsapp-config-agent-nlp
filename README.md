@@ -6,6 +6,10 @@ A lightweight AI Agent that lets non-technical users configure WhatsApp Business
 >
 > The agent figures out which WATI APIs to call, in what order, shows you the plan, and executes it on confirmation.
 
+## Live Demo
+
+Hosted at: https://whatsapp-configuration-agent-nlp.onrender.com
+
 ## Quick Start
 
 ```bash
