@@ -52,6 +52,13 @@ export function scenarioSendTemplate(llm: MockLLMProvider): void {
   );
 }
 
+/** Scenario: user asks something out of scope (e.g., general knowledge) */
+export function scenarioOutOfScope(llm: MockLLMProvider): void {
+  llm.enqueueText(
+    "I'm sorry, I can only help with WhatsApp Business management tasks such as contacts, messages, templates, and operators. Please ask me something related to your WATI account."
+  );
+}
+
 /** Scenario: user asks to list templates (read-only) */
 export function scenarioListTemplates(llm: MockLLMProvider): void {
   llm.enqueueToolUse([
