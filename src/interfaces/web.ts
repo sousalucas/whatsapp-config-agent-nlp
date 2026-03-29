@@ -1,12 +1,11 @@
 import express from "express";
 import path from "path";
-import { fileURLToPath } from "url";
 import { Agent } from "../agent/agent.js";
 import { t, setLocale, getLocale, getSupportedLocales } from "../i18n/index.js";
 import { AppError } from "../utils/errors.js";
 import { logger } from "../utils/logger.js";
 
-const __dirname = path.dirname(fileURLToPath(import.meta.url));
+const staticDir = path.resolve(process.cwd(), "src", "interfaces", "web-public");
 
 function handleApiError(err: unknown, res: express.Response): void {
   if (err instanceof AppError) {
@@ -24,7 +23,7 @@ function handleApiError(err: unknown, res: express.Response): void {
 export function createWebApp(agent: Agent): express.Express {
   const app = express();
   app.use(express.json());
-  app.use(express.static(path.join(__dirname, "web-public")));
+  app.use(express.static(staticDir));
 
   app.post("/api/chat", async (req, res) => {
     try {
